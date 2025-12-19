@@ -25,6 +25,9 @@ from verl.utils.hdfs_io import copy, makedirs
 
 
 def example_map_fn(example, idx, process_fn, data_source, ability, split):
+    """
+    将数据集处理成verl需要的格式
+    """
     question, solution = process_fn(example)
     data = {
         "data_source": data_source,
@@ -154,7 +157,8 @@ def build_livecodebench_dataset():
     print(f"Loading the {data_source} dataset from modelscope...", flush=True)
     from modelscope.msdatasets import MsDataset
     dataset =  MsDataset.load('livecodebench/code_generation_lite', version_tag="release_v2",trust_remote_code=True,split="test")
-   
+    # 只取4个数据
+    dataset = dataset.select(range(4))
     # R1 Evaluation use LiveCodeBench 24.08-25.01
     # dataset = dataset.filter()
     map_fn = partial(
@@ -164,6 +168,13 @@ def build_livecodebench_dataset():
     dataset = dataset.map(map_fn, with_indices=True, remove_columns=dataset.column_names, num_proc=8)
     return dataset
 
+# def build_apps_dataset():
+#     # 如何从APPS里取出需要的属性
+#     def process_apps(example):
+#         question = example["question"]
+#         solution = example["solutions"]
+        
+    
 
 TASK2DATA = {
     "aime2024": build_aime2024_dataset,
@@ -192,12 +203,13 @@ if __name__ == "__main__":
     datasets = []
     for task in args.tasks:
         datasets.append(TASK2DATA[task]())
+        
     test_dataset = concatenate_datasets(datasets)
 
     local_dir = args.local_dir
     hdfs_dir = args.hdfs_dir
 
-    test_dataset.to_parquet(os.path.join(local_dir, "test.parquet"))
+    test_dataset.to_parquet(os.path.join(local_dir, "test_4P.parquet"))
 
     if hdfs_dir is not None:
         makedirs(hdfs_dir)

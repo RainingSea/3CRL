@@ -3,7 +3,7 @@ import json
 import multiprocessing
 import pickle
 import zlib
-import wandb
+# import wandb
 
 # Reuse `run_test` for convenience
 # from verl.utils.reward_score.prime_code.testing_util_old import run_test
@@ -47,7 +47,6 @@ def check_correctness(in_outs, generation, timeout, debug=True):
 
 
 import ray
-# @ray.remote
 def compute_score_livecodebench(completion, test_cases):
     compute_result = compute_score_livecodebench_impl(completion, test_cases)
     return compute_result
@@ -62,13 +61,10 @@ def compute_score_livecodebench_impl(completion, test_cases):
         in_outs = json.loads(test_cases)
     except Exception as e:
         # 有可能压缩过，需要解压
-        print(f"Data may be zipped, Error loading test cases: {e}")
         try:
             # 正常情况下应该解析出一个字典，{"inputs": [c1,c2,c3], "outputs": [r1,r2,r3]}
             in_outs = json.loads(pickle.loads(zlib.decompress(base64.b64decode(test_cases.encode("utf-8")))))
-            
-            # wandb.init()
-            # wandb.log({"Test Cases after unzip": in_outs})
+            print("测试用例为 "+str(in_outs))
         except Exception as e:
             print(f"After unzip still Error: {e}")
             return False
@@ -76,10 +72,10 @@ def compute_score_livecodebench_impl(completion, test_cases):
     success = False
     try:
         res, metadata = check_correctness(in_outs=in_outs, generation=solution, timeout=6, debug=False)
-        print("测试结果："+str(res))
-        print("测试元数据："+str(metadata))
-        # wandb.log({"Reward Return": (res, metadata)})
-        success = all(map(lambda x: x is True, res))
+        print(f"generation:{solution}\n测试结果：{str(res)}\n测试元数据：{str(metadata)}")
+
+        # success = all(map(lambda x: x is True, res))
+        success = res.count(True) / len(in_outs["inputs"])  # 允许部分测试用例失败
     except Exception:
         pass
 
@@ -91,7 +87,8 @@ def compute_score(data_source, solution_str, ground_truth, extra_info=None):
     """
     
     result = compute_score_livecodebench(solution_str, ground_truth)
-    print("蒋黎维："+str(result))
+    print("奖励为："+str(result))
+    
     if result:
         return 1.0
     else:
@@ -99,3 +96,100 @@ def compute_score(data_source, solution_str, ground_truth, extra_info=None):
     
     # res, metadata = run_test(sample=example_io, test=solution_str, debug=False, timeout=60)
     # return sum(res)/len(res)
+
+gencode1="""from typing import List
+
+class Solution:
+    def minimizeConcatenatedLength(self, words: List[str]) -> int:
+        INF = 10**18
+        
+        # dp[a][b] = minimum length with starting char a and ending char b
+        dp = [[INF] * 26 for _ in range(26)]
+        
+        first_word = words[0]
+        f = ord(first_word[0]) - ord('a')
+        l = ord(first_word[-1]) - ord('a')
+        dp[f][l] = len(first_word)
+        
+        for w in words[1:]:
+            nf = ord(w[0]) - ord('a')
+            nl = ord(w[-1]) - ord('a')
+            wlen = len(w)
+            
+            new_dp = [[INF] * 26 for _ in range(26)]
+            
+            for a in range(26):
+                for b in range(26):
+                    if dp[a][b] == INF:
+                        continue
+                    
+                    cur = dp[a][b]
+                    
+                    # join(current, w)
+                    cost1 = cur + wlen - (1 if b == nf else 0)
+                    new_dp[a][nl] = min(new_dp[a][nl], cost1)
+                    
+                    # join(w, current)
+                    cost2 = cur + wlen - (1 if nl == a else 0)
+                    new_dp[nf][b] = min(new_dp[nf][b], cost2)
+            
+            dp = new_dp
+        
+        return min(min(row) for row in dp)"""
+
+gencode2="""def main():
+    import sys
+    data = sys.stdin.read().splitlines()
+    t = int(data[0])
+    
+    for i in range(1, t + 1):
+        s = data[i].strip()
+        # Split the string into contiguous groups of same characters
+        groups = []
+        current_char = s[0]
+        count = 1
+        for char in s[1:]:
+            if char == current_char:
+                count += 1
+            else:
+                groups.append((current_char, count))
+                current_char = char
+                count = 1
+        groups.append((current_char, count))
+        
+        # Extract lengths of groups that are '1's
+        ones_lengths = [length for char, length in groups if char == '1']
+        # Sort in descending order: players will pick largest available group of 1s first
+        ones_lengths.sort(reverse=True)
+        
+        # Alice picks first, then Bob, then Alice, etc.
+        # So Alice gets the 0th, 2nd, 4th, ... elements (even indices)
+        alice_score = sum(ones_lengths[j] for j in range(0, len(ones_lengths), 2))
+        print(alice_score)
+
+if __name__ == "__main__":
+    main()"""
+
+if __name__=="__main__":
+    example_io1={
+        "inputs":[
+          "5\n01111001\n0000\n111111\n101010101\n011011110111\n",
+          
+        ],
+        "outputs":[
+          "4\n0\n6\n3\n6\n"
+        ]
+      }
+    example_io2={
+        "inputs":[
+          "5\n01111001\n0000\n111111\n101010101\n011011110111\n",
+          "5\n01111001\n0000\n111111\n101010101\n011011110111\n"
+        ],
+        "outputs":[
+          "4\n0\n6\n3\n6\n",
+          "4\n0\n6\n3\n7\n"
+        ],
+      }
+    
+    res, metadata = run_test(sample=example_io2, test=gencode2, debug=False, timeout=60)
+    print(res)

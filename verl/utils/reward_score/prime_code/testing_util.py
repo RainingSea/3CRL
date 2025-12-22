@@ -418,7 +418,6 @@ def run_test(sample, test=None, debug=False, timeout=6):
     # max memory is set to 4GB
     reliability_guard()
     
-    print(type(sample))
     
     if debug:
         print(f"start = {datetime.now().time()}")
@@ -443,8 +442,8 @@ def run_test(sample, test=None, debug=False, timeout=6):
         print(f"loaded input_output = {datetime.now().time()}")
 
     if test is None:
-        assert False, "should not happen: test code is none"
-        return in_outs, {"error": "no test code provided"}
+        # assert False, "should not happen: test code is none"
+        return [-4], {"error": "no test code provided"}
     elif test is not None:
         results = []
         sol = import_string

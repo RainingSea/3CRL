@@ -51,7 +51,7 @@ def parquet_to_json(parquet_path, json_path):
                 try:
                     in_outs = json.loads(pickle.loads(zlib.decompress(base64.b64decode(test_case.encode("utf-8")))))
                 except Exception as e:
-                    print(f"Data may be zipped, Error loading test cases: {e}")
+                    print(f"Data Error even try to unzip when loading test cases: {e}")
                     return False
             rm["ground_truth"] = in_outs
         return rm
@@ -59,7 +59,7 @@ def parquet_to_json(parquet_path, json_path):
     df["reward_model"] = df["reward_model"].apply(decode_reward_model)
     # 保存为 JSON
     output_path = json_path
-    df.to_json(
+    df.head(50).to_json(
         output_path,
         orient="records",
         force_ascii=False,
@@ -67,11 +67,12 @@ def parquet_to_json(parquet_path, json_path):
     )
 
 if __name__ == "__main__":
-    json_path = r"D:\Project\C3RL\demos\data_visul\results\livecodebench_4P_lite.json"
-    full_parquet_path = r"D:\Project\C3RL\demos\data\test_4P.parquet"
-    parquet_path = r"D:\Project\C3RL\demos\data\test_4P_lite.parquet"
+    json_path = r"D:\Project\C3RL\demos\data\data_json\apps_10P.json"
+    
+    full_parquet_path = r"D:\Project\C3RL\demos\data\test_apps.parquet"
+    # parquet_path = r"D:\Project\C3RL\demos\data\test_4P_lite.parquet"
     
     
     # json_to_parquet(json_path, parquet_path)
-    parquet_to_json(parquet_path, json_path)
+    parquet_to_json(full_parquet_path, json_path)
     

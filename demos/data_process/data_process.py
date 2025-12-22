@@ -138,10 +138,10 @@ def build_livecodebench_dataset():
         try:
             private_test_cases = json.loads(example["private_test_cases"])
         except Exception as e:
-            print(f"Error loading private test cases: {e}")
             private_test_cases = json.loads(
                 pickle.loads(zlib.decompress(base64.b64decode(example["private_test_cases"].encode("utf-8"))))
             )
+            print(f"Error loading private test cases: {e}")
         full_test_cases = public_test_cases + private_test_cases
 
         metadata = json.loads(example["metadata"])
@@ -158,7 +158,7 @@ def build_livecodebench_dataset():
     from modelscope.msdatasets import MsDataset
     dataset =  MsDataset.load('livecodebench/code_generation_lite', version_tag="release_v2",trust_remote_code=True,split="test")
     # 只取4个数据
-    dataset = dataset.select(range(4))
+    
     # R1 Evaluation use LiveCodeBench 24.08-25.01
     # dataset = dataset.filter()
     map_fn = partial(
@@ -168,12 +168,113 @@ def build_livecodebench_dataset():
     dataset = dataset.map(map_fn, with_indices=True, remove_columns=dataset.column_names, num_proc=8)
     return dataset
 
-# def build_apps_dataset():
-#     # 如何从APPS里取出需要的属性
-#     def process_apps(example):
-#         question = example["question"]
-#         solution = example["solutions"]
-        
+def build_apps_dataset(base_path=None):
+    import os
+    import json
+    import base64
+    import pickle
+    import zlib
+    from datasets import Dataset
+    from functools import partial
+
+    if base_path is None:
+        raise ValueError("Please provide the base path for the apps dataset.")
+    if not os.path.isdir(base_path):
+        raise FileNotFoundError(f"apps base path not found: {base_path}")
+
+    # Step 1: 构建原始样本列表（每个样本是一个 dict，模拟 parquet 行）
+    raw_examples = []
+    folders = sorted(os.listdir(base_path))
+    for folder in folders:
+        folder_path = os.path.join(base_path, folder)
+        if not os.path.isdir(folder_path):
+            continue
+
+        try:
+            qpath = os.path.join(folder_path, "question.txt")
+            iopath = os.path.join(folder_path, "input_output.json")
+            metapath = os.path.join(folder_path, "metadata.json")
+
+            with open(qpath, "r", encoding="utf-8") as f:
+                question_text = f.read().strip()
+
+            with open(iopath, "r", encoding="utf-8") as f:
+                io_data = json.load(f)
+
+            with open(metapath, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+
+            # 构造一个“原始样本”，字段名与 LiveCodeBench 对齐（便于复用 process_fn）
+            
+            raw_example = {
+                "question_content": question_text,
+                "public_test_cases": [],  # APPS 没有 public/private 区分，全部视为 public
+                "private_test_cases": [],  # 我们把所有 test cases 放在 public 里，private 留空
+                "starter_code": "",       # APPS 通常无 starter code
+                "metadata": meta,
+                "io_data": io_data,       # 自定义字段，用于 process_fn 提取 inputs/outputs
+                "extra_info": {"idx":folder,"difficulty": meta.get("difficulty","unknown"),"url": meta.get("url","unknown")}
+            }
+            raw_examples.append(raw_example)
+
+        except Exception as e:
+            print(f"Skipping {folder}: {e}")
+            continue
+
+    if not raw_examples:
+        return Dataset.from_list([])
+
+    # Step 2: 转为 HuggingFace Dataset
+    dataset = Dataset.from_list(raw_examples)
+
+    # Step 3: 定义针对 APPS 的 process_fn（注意：它接收的是上面构造的 raw_example）
+    def process_apps(example):
+        # 构建 prompt
+        query_prompt = (
+            "You will be given a question (problem specification) and will generate a correct Python program "
+            "that matches the specification and passes all tests.\n\nQuestion: {}\n\n".format(example["question_content"])
+        )
+        query_prompt += (
+            "Read the inputs from stdin solve the problem and write the answer to stdout (do not directly test "
+            "on the sample inputs). Enclose your code within delimiters as follows. Ensure that when the python "
+            "program runs, it reads the inputs, runs the algorithm and writes output to STDOUT."
+            "```python\n# YOUR CODE HERE\n```"
+        )
+
+        # 构建 test cases
+        io_data = example["io_data"]
+        metadata = example["metadata"]
+        test_cases = {
+            "inputs": io_data.get("inputs", []),
+            "outputs": io_data.get("outputs", []),
+            "fn_name": metadata.get("fn_name") if isinstance(metadata, dict) else None,
+        }
+
+        # 压缩 ground truth
+        text_cases_compressed = base64.b64encode(
+            zlib.compress(pickle.dumps(json.dumps(test_cases)))
+        ).decode("utf-8")
+
+        return query_prompt, text_cases_compressed
+
+    # Step 4: 复用统一的 map 函数
+    data_source = "local_apps"
+    map_fn = partial(
+        example_map_fn,
+        process_fn=process_apps,
+        data_source=data_source,
+        ability="Code",
+        split="test"
+    )
+
+    dataset = dataset.map(
+        map_fn,
+        with_indices=True,
+        remove_columns=dataset.column_names,
+        num_proc=8
+    )
+
+    return dataset
     
 
 TASK2DATA = {
@@ -181,6 +282,7 @@ TASK2DATA = {
     "gpqa_diamond": build_gpqa_dimond_dataset,
     "cnmo2024": build_cnmo2024_dataset,
     "livecodebench": build_livecodebench_dataset,
+    "apps": partial(build_apps_dataset, base_path=r"D:\Project\Datasets\APPS_DATA\train"),
 }
 SUPPORTED_TASKS = TASK2DATA.keys()
 
@@ -209,7 +311,7 @@ if __name__ == "__main__":
     local_dir = args.local_dir
     hdfs_dir = args.hdfs_dir
 
-    test_dataset.to_parquet(os.path.join(local_dir, "test_4P.parquet"))
+    test_dataset.to_parquet(os.path.join(local_dir, "test_apps.parquet"))
 
     if hdfs_dir is not None:
         makedirs(hdfs_dir)

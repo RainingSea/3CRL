@@ -1,23 +1,45 @@
-t = int(input().strip())
+from typing import List
 
-for _ in range(t):
-    s = input().strip()
-    # If it's already "abc", YES
-    if s == "abc":
-        print("YES")
-        continue
+class Solution:
+    def minimizeConcatenatedLength(self, words: List[str]) -> int:
+        INF = 10**18
+        
+        # dp[a][b] = minimum length with starting char a and ending char b
+        dp = [[INF] * 26 for _ in range(26)]
+        
+        first_word = words[0]
+        f = ord(first_word[0]) - ord('a')
+        l = ord(first_word[-1]) - ord('a')
+        dp[f][l] = len(first_word)
+        
+        for w in words[1:]:
+            nf = ord(w[0]) - ord('a')
+            nl = ord(w[-1]) - ord('a')
+            wlen = len(w)
+            
+            new_dp = [[INF] * 26 for _ in range(26)]
+            
+            for a in range(26):
+                for b in range(26):
+                    if dp[a][b] == INF:
+                        continue
+                    
+                    cur = dp[a][b]
+                    
+                    # join(current, w)
+                    cost1 = cur + wlen - (1 if b == nf else 0)
+                    new_dp[a][nl] = min(new_dp[a][nl], cost1)
+                    
+                    # join(w, current)
+                    cost2 = cur + wlen - (1 if nl == a else 0)
+                    new_dp[nf][b] = min(new_dp[nf][b], cost2)
+            
+            dp = new_dp
+        
+        return min(min(row) for row in dp)
+
+if __name__=="__main__":
+    a = Solution()
+    print(a.minimizeConcatenatedLength(["aa", "ab", "bc"]))
+    # print(a.minimizeConcatenatedLength([["aa", "ab", 'bc']]))
     
-    # Try all possible single swaps (there are only 3 choose 2 = 3 swaps)
-    chars = list(s)
-    possible = False
-    # Swap positions (0,1), (0,2), (1,2)
-    swaps = [(0,1), (0,2), (1,2)]
-    for i, j in swaps:
-        # Perform swap
-        chars[i], chars[j] = chars[j], chars[i]
-        if ''.join(chars) == "abc":
-            possible = True
-        # Swap back to original for next iteration
-        chars[i], chars[j] = chars[j], chars[i]
-    
-    print("YES" if possible else "NO")

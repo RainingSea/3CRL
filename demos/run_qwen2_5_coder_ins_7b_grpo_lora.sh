@@ -3,17 +3,17 @@ set -x
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     trainer.val_before_train=False \
-    data.train_files=/root/autodl-tmp/dataset/test.parquet \
-    data.val_files=/root/autodl-tmp/dataset/test.parquet \
+    data.train_files=/home/veRL/demos/data/test_4P_lite.parquet \
+    data.val_files=/home/veRL/demos/data/test_4P_lite.parquet \
     data.train_batch_size=1 \
     data.max_prompt_length=512 \
     data.max_response_length=1024 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     data.shuffle=False \
-    custom_reward_function.path=/home/verl-main/demos/reward/code_reward.py\
+    custom_reward_function.path=/home/veRL/demos/reward/code_reward.py\
     custom_reward_function.name="compute_score" \
-    actor_rollout_ref.model.path=/root/autodl-tmp/Qwen2.5-Coder-0.5B-Instruct \
+    actor_rollout_ref.model.path=/root/autodl-tmp/Qwen2.5-Coder-7B-Instruct \
     actor_rollout_ref.model.lora_rank=64 \
     actor_rollout_ref.model.lora_alpha=32 \
     actor_rollout_ref.actor.optim.lr=3e-6 \
@@ -39,8 +39,8 @@ python3 -m verl.trainer.main_ppo \
     algorithm.use_kl_in_reward=False \
     trainer.critic_warmup=0 \
     trainer.logger='["console","wandb"]' \
-    trainer.project_name='verl_grpo_example_gsm8k' \
-    trainer.experiment_name='qwen2.5_05b_grpo_lora' \
+    trainer.project_name='VeRL-Qwen25' \
+    trainer.experiment_name='qwen2.5_7b_grpo_lora' \
     trainer.n_gpus_per_node=1 \
     trainer.nnodes=1 \
     trainer.save_freq=20 \

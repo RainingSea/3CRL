@@ -70,9 +70,9 @@ if __name__ == "__main__":
     json_path = r"D:\Project\C3RL\demos\data\data_json\apps_10P.json"
     
     full_parquet_path = r"D:\Project\C3RL\demos\data\test_apps.parquet"
-    # parquet_path = r"D:\Project\C3RL\demos\data\test_4P_lite.parquet"
+    parquet_path = r"D:\Project\C3RL\demos\data\test_4P_lite.parquet"
     
     
-    # json_to_parquet(json_path, parquet_path)
-    parquet_to_json(full_parquet_path, json_path)
+    json_to_parquet(json_path, parquet_path)
+    # parquet_to_json(full_parquet_path, json_path)
     

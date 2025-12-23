@@ -3,11 +3,12 @@ import json
 import multiprocessing
 import pickle
 import zlib
-# import wandb
+import wandb
 
 # Reuse `run_test` for convenience
 # from verl.utils.reward_score.prime_code.testing_util_old import run_test
 from verl.utils.reward_score.prime_code.testing_util import run_test
+from verl.utils.tracking import Tracking
 
 def _temp_run(in_outs, generation, debug, result, metadata_list, timeout):
     """
@@ -51,28 +52,35 @@ def compute_score_livecodebench(completion, test_cases):
     compute_result = compute_score_livecodebench_impl(completion, test_cases)
     return compute_result
 
+wandb.init()
 
 def compute_score_livecodebench_impl(completion, test_cases):
     solution = completion.split("```python")[-1].split("```")[0]
-    
+    wandb.log({"solution": test_cases})
+    # logger.log("Evaluating solution:\n"+solution)
+    print("1 - 测试用例为 "+str(test_cases))
     # extract test cases
-    try:
-        # 正常情况下应该解析出一个字典，{"inputs": [c1,c2,c3], "outputs": [r1,r2,r3]}
-        in_outs = json.loads(test_cases)
-    except Exception as e:
-        # 有可能压缩过，需要解压
+    if type(test_cases) != dict:
         try:
             # 正常情况下应该解析出一个字典，{"inputs": [c1,c2,c3], "outputs": [r1,r2,r3]}
-            in_outs = json.loads(pickle.loads(zlib.decompress(base64.b64decode(test_cases.encode("utf-8")))))
-            print("测试用例为 "+str(in_outs))
+            in_outs = json.loads(test_cases)
         except Exception as e:
-            print(f"After unzip still Error: {e}")
-            return False
-
+            # 有可能压缩过，需要解压
+            try:
+                # 正常情况下应该解析出一个字典，{"inputs": [c1,c2,c3], "outputs": [r1,r2,r3]}
+                print("may has zip, try to unzip")
+                in_outs = json.loads(pickle.loads(zlib.decompress(base64.b64decode(test_cases.encode("utf-8")))))
+                # print("测试用例为 "+str(in_outs))
+            except Exception as e:
+                print(f"After unzip still Error: {e}")
+                return False
+    else:
+        in_outs = test_cases
+        
     success = False
     try:
         res, metadata = check_correctness(in_outs=in_outs, generation=solution, timeout=6, debug=False)
-        print(f"generation:{solution}\n测试结果：{str(res)}\n测试元数据：{str(metadata)}")
+        print(f"生成代码:{solution}\n测试结果：{str(res)}\n测试元数据：{str(metadata)}")
 
         # success = all(map(lambda x: x is True, res))
         success = res.count(True) / len(in_outs["inputs"])  # 允许部分测试用例失败

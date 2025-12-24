@@ -34,6 +34,9 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.n=8 \
     actor_rollout_ref.rollout.load_format=safetensors \
     actor_rollout_ref.rollout.layered_summon=True \
+    actor_rollout_ref.rollout.multi_turn.enable=True \
+    actor_rollout_ref.rollout.multi_turn.max_user_turns=4 \
+    actor_rollout_ref.rollout.multi_turn.max_assistant_turns=4 \
     actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=1 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     algorithm.use_kl_in_reward=False \
@@ -41,7 +44,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.logger='["console","wandb"]' \
     trainer.project_name='VeRL-Qwen25' \
     trainer.experiment_name='qwen2.5_7b_grpo_lora' \
-    trainer.n_gpus_per_node=1 \
+    trainer.n_gpus_per_node=2 \
     trainer.nnodes=1 \
     trainer.save_freq=20 \
     trainer.test_freq=5 \

@@ -57,9 +57,7 @@ class CustomSandboxFusionTool(SandboxFusionTool):
         # sandbox has no score or metrics, use Nones
         return result, None, None
 
-
 answer_format = """\nThe answer format must be: \\boxed{'The final answer goes here.'}"""
-
 
 class CustomRLHFDataset(RLHFDataset):
     """Custom dataset class to process Maxwell-Jia/AIME_2024, yentinglin/aime_2025 datasets."""
